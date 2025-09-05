@@ -1,4 +1,4 @@
-# PIX Keys API
+# API de Chaves PIX
 
 API para cadastro, alteração, consulta e inativação de **chaves PIX**.
 
@@ -11,7 +11,11 @@ API para cadastro, alteração, consulta e inativação de **chaves PIX**.
 ## Por que MongoDB?
 Modelo de documentos combina com os JSONs da API, esquema flexível (sem migrações) e **índice único** para garantir unicidade da chave. Configuração simples com Spring Data + Docker/Testcontainers.
 
-## Padrões de projeto (planejados)
+## ## Padrões de Projeto (Design Patterns)
+
+**Referência:** https://refactoring.guru/
+
+#### Plano:
 - **Strategy + Factory (planejado)** — encapsular validações por **tipo de chave** (evita `if/switch`, favorece OCP).
 - **Specification-like (planejado)** — consultas **combináveis** no Mongo usando `MongoTemplate + Criteria` (regras: sem inclusão+inativação juntas).
 - **Value Object (planejado)** — `Account` (tipo/agência/conta) **imutável** (igualdade por valor).
