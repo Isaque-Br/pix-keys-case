@@ -15,11 +15,18 @@ Modelo de documentos combina com os JSONs da API, esquema flexível (sem migraç
 
 **Referência:** https://refactoring.guru/
 
-#### Plano:
-- **Strategy + Factory (planejado)** — encapsular validações por **tipo de chave** (evita `if/switch`, favorece OCP).
-- **Specification-like (planejado)** — consultas **combináveis** no Mongo usando `MongoTemplate + Criteria` (regras: sem inclusão+inativação juntas).
-- **Value Object (planejado)** — `Account` (tipo/agência/conta) **imutável** (igualdade por valor).
-________________________________________________________________________________________________________________________
+#### Plano Principal:
+- **Strategy + Factory**  
+  **Por que:** as regras de validação mudam por **tipo de chave** (telefone, e-mail, CPF, CNPJ, aleatória).  
+  **Como aplica:** cada tipo tem um **validador** (uma Strategy) com suas regras; uma **Factory** entrega a Strategy certa a partir do `KeyType`.  
+  **Benefícios:** elimina `if/switch`, facilita **OCP** (abertura para novos tipos), deixa a **regra testável** por unidade (um teste por Strategy).
+
+  ### Suporte
+- **Specification-like (Criteria)**  
+  **Por que:** o case pede **consultas combináveis** (tipo, agência+conta, nome, data de inclusão **ou** de inativação), e no Mongo **não** há `JpaSpecification`.  
+  **Como aplica:** montamos `Query` com `Criteria` (via `MongoTemplate`) conforme filtros válidos, incluindo as restrições do case (ex.: **não** combinar inclusão **e** inativação).  
+  **Benefícios:** consultas expressivas sem `if` bagunçado no repositório; regras de combinação ficam centralizadas.
+_________________________________________________________________________________________________________________________________________________________________________
 
 ## Validação (Smoke)
 
