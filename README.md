@@ -11,7 +11,7 @@ API para cadastro, alteração, consulta e inativação de **chaves PIX**.
 ## Por que MongoDB?
 Modelo de documentos combina com os JSONs da API, esquema flexível (sem migrações) e **índice único** para garantir unicidade da chave. Configuração simples com Spring Data + Docker/Testcontainers.
 
-## ## Padrões de Projeto (Design Patterns)
+## Padrões de Projeto (Design Patterns)
 
 **Referência:** https://refactoring.guru/
 
