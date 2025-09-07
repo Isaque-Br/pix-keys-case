@@ -1,8 +1,10 @@
 package br.com.itau.pixkeys.validation;
 
 import br.com.itau.pixkeys.domain.KeyType;
-import java.util.regex.Pattern;
+import org.springframework.stereotype.Component;
 
+import java.util.regex.Pattern;
+@Component
 public class EmailKeyValidator implements KeyValidator {
 
     private static final Pattern EMAIL =
