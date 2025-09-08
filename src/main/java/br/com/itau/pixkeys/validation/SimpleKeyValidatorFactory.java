@@ -14,7 +14,7 @@ public class SimpleKeyValidatorFactory implements KeyValidatorFactory {
         Objects.requireNonNull(validators, "lista de validadores não pode ser nula");
 
         for (KeyValidator v : validators) {
-            Objects.requireNonNull(v, "Validador não pode ser nulo");
+            Objects.requireNonNull(v, "validador não pode ser nulo");
             KeyType type = Objects.requireNonNull(v.supports(),
                     "supports() não pode retornar nulo");
 
