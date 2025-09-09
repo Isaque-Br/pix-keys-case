@@ -13,6 +13,11 @@ class EmailKeyValidatorTest {
     }
 
     @Test
+    void shouldReject_null() {
+        assertThrows(IllegalArgumentException.class, () -> v.validate(null));
+    }
+
+    @Test
     void shouldRejectBlank() {
         assertThrows(IllegalArgumentException.class, () -> v.validate("   "));
     }
@@ -20,7 +25,6 @@ class EmailKeyValidatorTest {
     @Test
     void shouldRejectInvalidFormat() {
        var ex = assertThrows(IllegalArgumentException.class, () -> v.validate("ana@exemplo"));
-        System.out.println("Mensagem da exceção: " + ex.getMessage());
 
         assertThrows(IllegalArgumentException.class, () -> v.validate("ana@@exemplo.com"));
         assertThrows(IllegalArgumentException.class, () -> v.validate("@exemplo.com"));
