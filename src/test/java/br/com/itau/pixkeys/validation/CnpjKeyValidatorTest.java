@@ -9,6 +9,12 @@ class CnpjKeyValidatorTest {
     CnpjKeyValidator v = new CnpjKeyValidator();
 
     @Test
+    void shouldReject_null_orBlank() {
+        assertThrows(IllegalArgumentException.class, () -> v.validate(null));
+        assertThrows(IllegalArgumentException.class, () -> v.validate("   "));
+    }
+
+    @Test
     void shouldAccept_validCnpj_withOrWithoutMask() {
         assertDoesNotThrow(() -> v.validate("12.345.678/0001-95"));
         assertDoesNotThrow(() -> v.validate("12345678000195"));
