@@ -1,6 +1,5 @@
 package br.com.itau.pixkeys.domain;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import com.fasterxml.jackson.databind.exc.ValueInstantiationException;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
@@ -30,4 +29,15 @@ public class AccountTypeJsonTest {
         assertTrue(ex.getCause() instanceof IllegalArgumentException);
         assertTrue(ex.getCause().getMessage().toLowerCase().contains("inválido"));
     }
+
+    @Test
+    void from_shouldReturnNull_whenNull() {
+        assertNull(AccountType.from(null));
+    }
+
+    @Test
+    void from_shouldReturnNull_whenBlank() {
+        assertNull(AccountType.from("   "));
+    }
+
 }
