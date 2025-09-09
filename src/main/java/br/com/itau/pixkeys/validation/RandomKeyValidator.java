@@ -3,8 +3,6 @@ package br.com.itau.pixkeys.validation;
 import br.com.itau.pixkeys.domain.KeyType;
 import org.springframework.stereotype.Component;
 
-import java.util.UUID;
-
 @Component
 public class RandomKeyValidator implements KeyValidator {
 
@@ -15,12 +13,12 @@ public class RandomKeyValidator implements KeyValidator {
 
     @Override
     public void validate(String key) {
-        if (key == null || key.isBlank()) {
+        if (key == null) {
             throw new IllegalArgumentException("random inválido");
         }
-        try {
-            UUID.fromString(key.strip());
-        } catch (IllegalArgumentException e) {
+
+        String v = key.strip();
+        if (v.isEmpty() || v.length() > 36 || !v.matches("^[A-Za-z0-9]{1,36}$")) {
             throw new IllegalArgumentException("random inválido");
         }
     }
