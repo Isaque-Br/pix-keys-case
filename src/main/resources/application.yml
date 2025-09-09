@@ -2,5 +2,6 @@ spring:
   data:
     mongodb:
       uri: ${MONGODB_URI:mongodb://admin:123@localhost:27017/pixdb?authSource=admin}
+      auto-index-creation: true   # cria/valida índices anotados (@CompoundIndex/@Indexed)
 server:
   port: ${PORT:8080}
