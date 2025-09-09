@@ -9,32 +9,27 @@ class RandomKeyValidatorTest {
     RandomKeyValidator v = new RandomKeyValidator();
 
     @Test
-    void shouldAccept_validUuid() {
-        String v4 = java.util.UUID.randomUUID().toString();
-        assertDoesNotThrow(() -> v.validate(v4));
+    void shouldAccept_alphanumeric_between1and36() {
+        assertDoesNotThrow(() -> v.validate("a"));
+        assertDoesNotThrow(() -> v.validate("A1b2C3"));
+        assertDoesNotThrow(() -> v.validate("A".repeat(36)));
     }
 
     @Test
-    void shouldReject_blank_orBadFormat() {
-        assertThrows(IllegalArgumentException.class, () -> v.validate(""));
-        assertThrows(IllegalArgumentException.class, () -> v.validate("not-a-uuid"));
-        assertThrows(IllegalArgumentException.class, () -> v.validate("123e4567e89b12d3a456426614174000"));
+    void shouldAccept_withSurroundingSpaces() {
+        assertDoesNotThrow(() -> v.validate("   AbC123   "));
     }
 
     @Test
-    void shouldReject_nonV4() {
-        String v3 = java.util.UUID.nameUUIDFromBytes("x".getBytes()).toString();
-        assertThrows(IllegalArgumentException.class, () -> v.validate(v3));
-    }
-
-    @Test
-    void shouldAccept_uppercase_andSurroundingSpaces() {
-        String u = java.util.UUID.randomUUID().toString();
-        assertDoesNotThrow(() -> v.validate("  " + u.toUpperCase() + "  "));
-    }
-
-    @Test
-    void shouldReject_null() {
+    void shouldReject_null_blank_nonAlnum_orTooLong() {
         assertThrows(IllegalArgumentException.class, () -> v.validate(null));
+        assertThrows(IllegalArgumentException.class, () -> v.validate(""));
+        assertThrows(IllegalArgumentException.class, () -> v.validate("   "));
+        assertThrows(IllegalArgumentException.class, () -> v.validate("abc-def"));
+        assertThrows(IllegalArgumentException.class, () -> v.validate("ábc123"));
+        assertThrows(IllegalArgumentException.class, () -> v.validate("a".repeat(37)));
+
+        assertThrows(IllegalArgumentException.class, () ->
+                v.validate("550e8400-e29b-41d4-a716-446655440000"));
     }
 }
