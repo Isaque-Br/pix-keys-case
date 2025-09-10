@@ -1,5 +1,6 @@
 package br.com.itau.pixkeys.application.service;
 
+import br.com.itau.pixkeys.api.NotFoundException;
 import br.com.itau.pixkeys.domain.AccountType;
 import br.com.itau.pixkeys.domain.KeyType;
 import br.com.itau.pixkeys.domain.model.PixKey;
@@ -50,5 +51,11 @@ public class PixKeyService {
         );
         PixKey saved = repo.save(entity);
         return saved.id();
+    }
+
+    /** Busca por ID ou lança 404 (NotFoundException) para o handler transformar em HTTP 404. */
+    public PixKey findById(String id) {
+        return repo.findById(id).orElseThrow(() ->
+                new NotFoundException("pix key não encontrada: " + id));
     }
 }
