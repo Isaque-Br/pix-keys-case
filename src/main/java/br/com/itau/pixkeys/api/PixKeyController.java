@@ -1,26 +1,33 @@
 package br.com.itau.pixkeys.api;
 
 import br.com.itau.pixkeys.api.dto.CreatePixKeyRequest;
-import br.com.itau.pixkeys.validation.KeyValidator;
-import br.com.itau.pixkeys.validation.SimpleKeyValidatorFactory;
+import br.com.itau.pixkeys.api.dto.CreatePixKeyResponse;
+import br.com.itau.pixkeys.application.service.PixKeyService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.net.URI;
 
 @RestController
 @RequestMapping("/pix-keys")
 public class PixKeyController {
 
-    private final SimpleKeyValidatorFactory factory;
+    private final PixKeyService service;
 
-    public PixKeyController(SimpleKeyValidatorFactory factory) {
-        this.factory = factory;
+    public PixKeyController(PixKeyService service) {
+        this.service = service;
     }
 
     @PostMapping
-    public ResponseEntity<Void> create(@Valid @RequestBody CreatePixKeyRequest req) {
-        KeyValidator v = factory.get(req.keyType());
-        v.validate(req.keyValue());
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<CreatePixKeyResponse> create(@Valid @RequestBody CreatePixKeyRequest req) {
+        String id = service.create(
+                req.keyType(), req.keyValue(),
+                req.accountType(), req.agency(), req.account(),
+                req.holderName(), req.holderSurname()
+        );
+        return ResponseEntity
+                .created(URI.create("/pix-keys/" + id))
+                .body(new CreatePixKeyResponse(id));
     }
 }
