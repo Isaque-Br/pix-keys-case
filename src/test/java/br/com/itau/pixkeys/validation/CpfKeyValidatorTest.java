@@ -10,14 +10,14 @@ class CpfKeyValidatorTest {
 
     @Test
     void shouldAccept_validCpf_withOrWithoutMask() {
-        assertDoesNotThrow(() -> v.validate("529.982.247-25")); // válido
-        assertDoesNotThrow(() -> v.validate("12345678909"));    // válido
+        assertDoesNotThrow(() -> v.validate("529.982.247-25"));
+        assertDoesNotThrow(() -> v.validate("12345678909"));
     }
 
     @Test
     void shouldReject_wrongLength_orRepeatedDigits_orWrongDigits() {
-        assertThrows(IllegalArgumentException.class, () -> v.validate("123.456.789-0")); // curto
-        assertThrows(IllegalArgumentException.class, () -> v.validate("00000000000"));   // repetido
-        assertThrows(IllegalArgumentException.class, () -> v.validate("529.982.247-24"));// DV errado
+        assertThrows(IllegalArgumentException.class, () -> v.validate("123.456.789-0"));
+        assertThrows(IllegalArgumentException.class, () -> v.validate("00000000000"));
+        assertThrows(IllegalArgumentException.class, () -> v.validate("529.982.247-24"));
     }
 }
