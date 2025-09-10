@@ -9,5 +9,4 @@ class PixKeysApplicationTests {
 	@Test
 	void contextLoads() {
 	}
-
 }

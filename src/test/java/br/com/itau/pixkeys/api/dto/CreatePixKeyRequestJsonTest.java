@@ -57,4 +57,5 @@ class CreatePixKeyRequestJsonTest {
         assertEquals("Ana", req.holderName());
         assertEquals("Silva", req.holderSurname());
     }
+
 }
