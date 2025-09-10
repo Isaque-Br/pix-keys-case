@@ -2,6 +2,7 @@ package br.com.itau.pixkeys.api.docs;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import br.com.itau.pixkeys.infrastructure.repository.PixKeyRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -10,6 +11,7 @@ import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 
 @SpringBootTest(
@@ -21,6 +23,9 @@ import org.springframework.http.ResponseEntity;
         }
 )
 class OpenApiDocsAvailabilityTest {
+
+    @MockitoBean
+    PixKeyRepository repo; // <-- mocka o repo para o contexto subir sem Mongo
 
     @LocalServerPort
     int port;
