@@ -59,6 +59,19 @@ public class PixKeyService {
                 new NotFoundException("pix key não encontrada: " + id));
     }
 
+    /** Inativa (soft delete) a chave. Lança 404 se não existir e 422 se já estiver inativa. */
+    public PixKey inactivate(String id) {
+        PixKey current = repo.findById(id)
+                .orElseThrow(() -> new NotFoundException("pix key não encontrada: " + id));
+
+        if (current.isInactive()) {
+            throw new IllegalStateException("chave já inativada");
+        }
+
+        PixKey updated = current.inactivate();
+        return repo.save(updated);
+    }
+
     public PixKey updateAccount(
             String id,
             AccountType accountType,
