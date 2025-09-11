@@ -1,12 +1,22 @@
 package br.com.itau.pixkeys.api;
+import static org.hamcrest.Matchers.notNullValue;
+import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import br.com.itau.pixkeys.application.service.PixKeyService;
+import br.com.itau.pixkeys.domain.AccountType;
+import br.com.itau.pixkeys.domain.KeyStatus;
+import br.com.itau.pixkeys.domain.KeyType;
+import br.com.itau.pixkeys.domain.model.PixKey;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+
+import java.time.Instant;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
@@ -14,6 +24,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(PixKeyController.class)
+@Import(ApiExceptionHandler.class) // garante o mapeamento 404 no slice
 class PixKeyControllerWebTest {
 
     @Autowired MockMvc mvc;
@@ -67,5 +78,61 @@ class PixKeyControllerWebTest {
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.title").value("Regra de negócio inválida"))
                 .andExpect(jsonPath("$.detail").value("chave já cadastrada"));
+    }
+
+    @Test
+    void get_shouldReturn200_andBody_whenFound() throws Exception {
+        // dado um PixKey fixo (sem usar .create() para manter determinismo)
+        PixKey found = new PixKey(
+                "abc",
+                KeyType.PHONE,
+                "+5511999991234",
+                AccountType.CHECKING,
+                "1250",
+                "00001234",
+                "Ana",
+                "Silva",
+                KeyStatus.ACTIVE,
+                Instant.parse("2025-01-01T10:00:00Z"),
+                null
+        );
+        when(service.findById("abc")).thenReturn(found);
+
+        mvc.perform(get("/pix-keys/{id}", "abc").accept(APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(APPLICATION_JSON))
+                .andExpect(jsonPath("$.id").value("abc"))
+                .andExpect(jsonPath("$.keyType").value("PHONE"))
+                .andExpect(jsonPath("$.keyValue").value("+5511999991234"))
+                .andExpect(jsonPath("$.accountType").value("corrente"))
+                .andExpect(jsonPath("$.agency").value("1250"))
+                .andExpect(jsonPath("$.account").value("00001234"))
+                .andExpect(jsonPath("$.holderName").value("Ana"))
+                .andExpect(jsonPath("$.holderSurname").value("Silva"))
+                .andExpect(jsonPath("$.status").value("ACTIVE"))
+                // datas em ISO-8601; aqui só garantimos que existe
+                .andExpect(jsonPath("$.createdAt", notNullValue()))
+                .andExpect(jsonPath("$.inactivatedAt").doesNotExist()); // null não aparece no DTO
+    }
+
+    @Test
+    void get_shouldReturn404_whenNotFound() throws Exception {
+        when(service.findById(anyString()))
+                .thenThrow(new NotFoundException("pix key não encontrada: x"));
+
+        mvc.perform(get("/pix-keys/x").accept(APPLICATION_JSON))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Recurso não encontrado"))
+                .andExpect(jsonPath("$.detail").value("pix key não encontrada: x"));
+    }
+
+    @Test
+    void get_shouldCallService_withSamePathId() throws Exception {
+        when(service.findById("xyz")).thenThrow(new NotFoundException("pix key não encontrada: xyz"));
+
+        mvc.perform(get("/pix-keys/{id}", "xyz").accept(APPLICATION_JSON))
+                .andExpect(status().isNotFound());
+
+        verify(service).findById("xyz"); // garante o encaminhamento correto do id
     }
 }

@@ -2,6 +2,7 @@ package br.com.itau.pixkeys.api;
 
 import br.com.itau.pixkeys.api.dto.CreatePixKeyRequest;
 import br.com.itau.pixkeys.api.dto.CreatePixKeyResponse;
+import br.com.itau.pixkeys.api.dto.PixKeyResponse;
 import br.com.itau.pixkeys.application.service.PixKeyService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -29,5 +30,11 @@ public class PixKeyController {
         return ResponseEntity
                 .created(URI.create("/pix-keys/" + id))
                 .body(new CreatePixKeyResponse(id));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<PixKeyResponse> getById(@PathVariable String id) {
+        var k = service.findById(id);
+        return ResponseEntity.ok(PixKeyResponse.from(k));
     }
 }
