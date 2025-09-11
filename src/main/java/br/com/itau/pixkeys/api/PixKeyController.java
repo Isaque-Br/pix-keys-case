@@ -3,6 +3,7 @@ package br.com.itau.pixkeys.api;
 import br.com.itau.pixkeys.api.dto.CreatePixKeyRequest;
 import br.com.itau.pixkeys.api.dto.CreatePixKeyResponse;
 import br.com.itau.pixkeys.api.dto.PixKeyResponse;
+import br.com.itau.pixkeys.api.dto.UpdatePixKeyAccountRequest;
 import br.com.itau.pixkeys.application.service.PixKeyService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -36,5 +37,19 @@ public class PixKeyController {
     public ResponseEntity<PixKeyResponse> getById(@PathVariable String id) {
         var k = service.findById(id);
         return ResponseEntity.ok(PixKeyResponse.from(k));
+    }
+
+    // PixKeyController.java
+    @PutMapping("/{id}/account")
+    public ResponseEntity<PixKeyResponse> updateAccount(
+            @PathVariable String id,
+            @Valid @RequestBody UpdatePixKeyAccountRequest req
+    ) {
+        var updated = service.updateAccount(
+                id,
+                req.accountType(), req.agency(), req.account(),
+                req.holderName(), req.holderSurname()
+        );
+        return ResponseEntity.ok(PixKeyResponse.from(updated));
     }
 }
