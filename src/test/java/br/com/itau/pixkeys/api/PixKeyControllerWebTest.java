@@ -1,4 +1,5 @@
 package br.com.itau.pixkeys.api;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -24,19 +25,19 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(PixKeyController.class)
-@Import(ApiExceptionHandler.class) // garante o mapeamento 404 no slice
+@WebMvcTest(PixKeyController.class)          // cliente de teste do Spring MVC (sem servidor, sem rede)
+@Import(ApiExceptionHandler.class)           // inclui o handler para mapear 400/404/422
 class PixKeyControllerWebTest {
 
-    @Autowired MockMvc mvc;
+    @Autowired MockMvc mvc;                  // cliente de teste do Spring MVC (sem servidor real)
 
     @MockitoBean
-    PixKeyService service; // <-- necessário no slice
+    PixKeyService service;                  // mock do service exigido pelo controller
 
     @Test
     void post_shouldReturn201_andBodyWithId_whenValid() throws Exception {
         when(service.create(any(), anyString(), any(), anyString(), anyString(), anyString(), any()))
-                .thenReturn("abc-123");
+                .thenReturn("abc-123");                 // stub do service: devolve um ID inventado
 
         mvc.perform(post("/pix-keys")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -52,14 +53,14 @@ class PixKeyControllerWebTest {
 
     @Test
     void post_shouldReturn400_withFields_whenDtoInvalid() throws Exception {
-        // sem stub do service: a validação do @Valid quebra antes (400)
+        // sem stub: a validação do @Valid falha antes e retorna 400
         mvc.perform(post("/pix-keys")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                     {"keyType":null,"keyValue":"","accountType":null,
                      "agency":"12","account":"1","holderName":"","holderSurname":null}
                 """))
-                .andExpect(status().isBadRequest())
+                .andExpect(status().isBadRequest())          // contrato: 400
                 .andExpect(jsonPath("$.title").value("Erro de validação"))
                 .andExpect(jsonPath("$.fields.agency").exists())
                 .andExpect(jsonPath("$.fields.account").exists());
@@ -76,14 +77,14 @@ class PixKeyControllerWebTest {
                     {"keyType":"EMAIL","keyValue":"dup@b.com","accountType":"corrente",
                      "agency":"1234","account":"00001234","holderName":"Ana","holderSurname":"Silva"}
                 """))
-                .andExpect(status().isUnprocessableEntity())
+                .andExpect(status().isUnprocessableEntity())            // contrato: 422
                 .andExpect(jsonPath("$.title").value("Regra de negócio inválida"))
                 .andExpect(jsonPath("$.detail").value("chave já cadastrada"));
     }
 
     @Test
     void get_shouldReturn200_andBody_whenFound() throws Exception {
-        // dado um PixKey fixo (sem usar .create() para manter determinismo)
+        // // monta entidade determinística para o mapeamento de saída
         PixKey found = new PixKey(
                 "abc",
                 KeyType.PHONE,
@@ -97,7 +98,7 @@ class PixKeyControllerWebTest {
                 Instant.parse("2025-01-01T10:00:00Z"),
                 null
         );
-        when(service.findById("abc")).thenReturn(found);
+        when(service.findById("abc")).thenReturn(found);       // stub do service: encontrado
 
         mvc.perform(get("/pix-keys/{id}", "abc").accept(APPLICATION_JSON))
                 .andExpect(status().isOk())
@@ -137,9 +138,6 @@ class PixKeyControllerWebTest {
         verify(service).findById("xyz"); // garante o encaminhamento correto do id
     }
 
-    // --------------------------------------------
-    // PUT 200 - sucesso
-    // --------------------------------------------
     @Test
     void put_shouldReturn200_andUpdatedBody_whenServiceSucceeds() throws Exception {
         // Por quê: comprova contrato HTTP (200) e payload atualizado quando o service devolve a entidade.
@@ -158,7 +156,7 @@ class PixKeyControllerWebTest {
                 null
         );
         when(service.updateAccount(eq("abc"), any(), anyString(), anyString(), anyString(), any()))
-                .thenReturn(updated);
+                .thenReturn(updated);           // stub do service: sucesso
 
         mvc.perform(put("/pix-keys/{id}/account", "abc")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -176,9 +174,6 @@ class PixKeyControllerWebTest {
                 .andExpect(jsonPath("$.inactivatedAt").doesNotExist());
     }
 
-    // --------------------------------------------
-    // PUT 404 - id não encontrado
-    // --------------------------------------------
     @Test
     void put_shouldReturn404_whenIdNotFound() throws Exception {
         // Por quê: o case exige 404 quando o ID não existe.
@@ -195,9 +190,7 @@ class PixKeyControllerWebTest {
                 .andExpect(jsonPath("$.detail").value("pix key não encontrada: xyz"));
     }
 
-    // --------------------------------------------
     // PUT 422 - regra de negócio (limite de chaves)
-    // --------------------------------------------
     @Test
     void put_shouldReturn422_whenBusinessRuleFails() throws Exception {
         // Por quê: converte IllegalStateException em 422 via ApiExceptionHandler.
@@ -212,5 +205,36 @@ class PixKeyControllerWebTest {
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.title").value("Regra de negócio inválida"))
                 .andExpect(jsonPath("$.detail").value("limite de chaves por conta atingido"));
+    }
+
+    @Test
+    void delete_shouldReturn204_whenOk() throws Exception {
+        // inactivate não precisa retornar nada pra 204
+        when(service.inactivate("abc")).thenReturn(null);
+
+        mvc.perform(delete("/pix-keys/abc"))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void delete_shouldReturn404_whenNotFound() throws Exception {
+        when(service.inactivate("x"))
+                .thenThrow(new NotFoundException("pix key não encontrada: x"));
+
+        mvc.perform(delete("/pix-keys/x").accept(APPLICATION_JSON))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Recurso não encontrado"))
+                .andExpect(jsonPath("$.detail").value("pix key não encontrada: x"));
+    }
+
+    @Test
+    void delete_shouldReturn422_whenAlreadyInactive() throws Exception {
+        when(service.inactivate("abc"))
+                .thenThrow(new IllegalStateException("chave já inativada"));
+
+        mvc.perform(delete("/pix-keys/abc").accept(APPLICATION_JSON))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.title").value("Regra de negócio inválida"))
+                .andExpect(jsonPath("$.detail").value("chave já inativada"));
     }
 }
