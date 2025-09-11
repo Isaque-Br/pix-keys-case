@@ -1,6 +1,7 @@
 package br.com.itau.pixkeys.api;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import br.com.itau.pixkeys.application.service.PixKeyService;
@@ -134,5 +135,82 @@ class PixKeyControllerWebTest {
                 .andExpect(status().isNotFound());
 
         verify(service).findById("xyz"); // garante o encaminhamento correto do id
+    }
+
+    // --------------------------------------------
+    // PUT 200 - sucesso
+    // --------------------------------------------
+    @Test
+    void put_shouldReturn200_andUpdatedBody_whenServiceSucceeds() throws Exception {
+        // Por quê: comprova contrato HTTP (200) e payload atualizado quando o service devolve a entidade.
+
+        PixKey updated = new PixKey(
+                "abc",
+                KeyType.EMAIL,
+                "a@b.com",
+                AccountType.SAVINGS,
+                "9999",
+                "00009999",
+                "Ana Paula",
+                "Silva",
+                KeyStatus.ACTIVE,
+                Instant.parse("2025-01-01T10:00:00Z"),
+                null
+        );
+        when(service.updateAccount(eq("abc"), any(), anyString(), anyString(), anyString(), any()))
+                .thenReturn(updated);
+
+        mvc.perform(put("/pix-keys/{id}/account", "abc")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {"accountType":"poupanca","agency":"9999","account":"00009999","holderName":"Ana Paula","holderSurname":"Silva"}
+                        """))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.id").value("abc"))
+                .andExpect(jsonPath("$.accountType").value("poupanca"))
+                .andExpect(jsonPath("$.agency").value("9999"))
+                .andExpect(jsonPath("$.account").value("00009999"))
+                .andExpect(jsonPath("$.holderName").value("Ana Paula"))
+                .andExpect(jsonPath("$.createdAt", notNullValue()))
+                .andExpect(jsonPath("$.inactivatedAt").doesNotExist());
+    }
+
+    // --------------------------------------------
+    // PUT 404 - id não encontrado
+    // --------------------------------------------
+    @Test
+    void put_shouldReturn404_whenIdNotFound() throws Exception {
+        // Por quê: o case exige 404 quando o ID não existe.
+        when(service.updateAccount(anyString(), any(), anyString(), anyString(), anyString(), any()))
+                .thenThrow(new NotFoundException("pix key não encontrada: xyz"));
+
+        mvc.perform(put("/pix-keys/{id}/account", "xyz")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {"accountType":"corrente","agency":"1250","account":"00001234","holderName":"Ana","holderSurname":"Silva"}
+                        """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("Recurso não encontrado"))
+                .andExpect(jsonPath("$.detail").value("pix key não encontrada: xyz"));
+    }
+
+    // --------------------------------------------
+    // PUT 422 - regra de negócio (limite de chaves)
+    // --------------------------------------------
+    @Test
+    void put_shouldReturn422_whenBusinessRuleFails() throws Exception {
+        // Por quê: converte IllegalStateException em 422 via ApiExceptionHandler.
+        when(service.updateAccount(anyString(), any(), anyString(), anyString(), anyString(), any()))
+                .thenThrow(new IllegalStateException("limite de chaves por conta atingido"));
+
+        mvc.perform(put("/pix-keys/{id}/account", "abc")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {"accountType":"poupanca","agency":"9999","account":"00009999","holderName":"Ana","holderSurname":"Silva"}
+                        """))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.title").value("Regra de negócio inválida"))
+                .andExpect(jsonPath("$.detail").value("limite de chaves por conta atingido"));
     }
 }
