@@ -39,7 +39,6 @@ public class PixKeyController {
         return ResponseEntity.ok(PixKeyResponse.from(k));
     }
 
-    // PixKeyController.java
     @PutMapping("/{id}/account")
     public ResponseEntity<PixKeyResponse> updateAccount(
             @PathVariable String id,
@@ -51,5 +50,11 @@ public class PixKeyController {
                 req.holderName(), req.holderSurname()
         );
         return ResponseEntity.ok(PixKeyResponse.from(updated));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable String id) {
+        service.inactivate(id);
+        return ResponseEntity.noContent().build(); // 204
     }
 }
