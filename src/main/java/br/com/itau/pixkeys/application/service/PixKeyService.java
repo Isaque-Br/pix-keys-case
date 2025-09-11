@@ -58,4 +58,35 @@ public class PixKeyService {
         return repo.findById(id).orElseThrow(() ->
                 new NotFoundException("pix key não encontrada: " + id));
     }
+
+    public PixKey updateAccount(
+            String id,
+            AccountType accountType,
+            String agency,
+            String account,
+            String holderName,
+            String holderSurname
+    ) {
+        // 1) Carrega ou 404
+        PixKey current = repo.findById(id)
+                .orElseThrow(() -> new NotFoundException("pix key não encontrada: " + id));
+
+        // 2) Regras de negócio de limite por conta
+        long countAtTarget = repo.countByAgencyAndAccount(agency, account);
+        // Se a chave já está nessa conta, desconsidere ela do count
+        if (agency.equals(current.agency()) && account.equals(current.account())) {
+            // não muda o número total efetivo
+        } else {
+            int limit = 5; // TODO: quando houver HolderType (PF/PJ), aplicar PF=5 e PJ=20
+            if (countAtTarget >= limit) {
+                throw new IllegalStateException("limite de chaves por conta atingido");
+            }
+        }
+
+        // 3) Atualiza no domínio (valida inatividade)
+        PixKey updated = current.updateAccount(accountType, agency, account, holderName, holderSurname);
+
+        // 4) Persiste e retorna entidade
+        return repo.save(updated);
+    }
 }
