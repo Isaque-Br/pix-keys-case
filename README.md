@@ -35,8 +35,10 @@ cd ..
 
 ### Acesso rápido
 - Swagger UI: http://localhost:8080/swagger-ui/index.html
-- Banco (Mongo local, via Compass): mongodb://localhost:27017
 
+#### Dica (MongoDB Compass)
+Após `docker compose up -d` em `local/`, conecte no Compass com:
+- Connection: `mongodb://localhost:27017`
 - Authentication
 Username: admin
 Password: 123
