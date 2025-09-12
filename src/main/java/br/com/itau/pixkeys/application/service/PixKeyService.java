@@ -30,8 +30,15 @@ public class PixKeyService {
             AccountType accountType, String agency, String account,
             String holderName, String holderSurname
     ) {
-        // 1) Validação de formato/semântica (delegada ao validador do tipo)
-        factory.get(keyType).validate(keyValue);
+        // 1) Validação de formato/semântica
+        if (keyType == KeyType.RANDOM) {
+            // 32 caracteres alfanuméricos (A–Z, a–z, 0–9)
+            if (keyValue == null || !keyValue.matches("^[A-Za-z0-9]{32}$")) {
+                throw new BusinessRuleViolationException("random inválido: esperado 32 caracteres alfanuméricos");
+            }
+        } else {
+            factory.get(keyType).validate(keyValue);
+        }
 
         // 2) Unicidade global do valor da chave
         if (repo.findByKeyValue(keyValue).isPresent()) {
