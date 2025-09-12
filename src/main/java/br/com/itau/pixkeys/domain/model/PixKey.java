@@ -1,6 +1,7 @@
 package br.com.itau.pixkeys.domain.model;
 
 import br.com.itau.pixkeys.domain.AccountType;
+import br.com.itau.pixkeys.domain.BusinessRuleViolationException;
 import br.com.itau.pixkeys.domain.KeyStatus;
 import br.com.itau.pixkeys.domain.KeyType;
 import org.springframework.data.annotation.Id;
@@ -62,7 +63,9 @@ public record PixKey(
 
     // Transição: inativar (somente uma vez)
     public PixKey inactivate() {
-        if (isInactive()) throw new IllegalArgumentException("chave já inativada");
+        if (isInactive()) {
+            throw new BusinessRuleViolationException("chave já inativada");
+        }
         return new PixKey(
                 id, keyType, keyValue, accountType, agency, account,
                 holderName, holderSurname,
@@ -76,7 +79,9 @@ public record PixKey(
     public PixKey updateAccount(
             AccountType at, String ag, String acc, String name, String surname
     ) {
-        if (isInactive()) throw new IllegalArgumentException("chave inativa");
+        if (isInactive()) {
+            throw new BusinessRuleViolationException("chave inativa");
+        }
         Objects.requireNonNull(at, "accountType não pode ser nulo");
         return new PixKey(
                 id,

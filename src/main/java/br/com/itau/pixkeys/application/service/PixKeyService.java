@@ -2,6 +2,7 @@ package br.com.itau.pixkeys.application.service;
 
 import br.com.itau.pixkeys.api.NotFoundException;
 import br.com.itau.pixkeys.domain.AccountType;
+import br.com.itau.pixkeys.domain.BusinessRuleViolationException;
 import br.com.itau.pixkeys.domain.KeyType;
 import br.com.itau.pixkeys.domain.model.PixKey;
 import br.com.itau.pixkeys.infrastructure.repository.PixKeyRepository;
@@ -34,15 +35,14 @@ public class PixKeyService {
 
         // 2) Unicidade global do valor da chave
         if (repo.findByKeyValue(keyValue).isPresent()) {
-            throw new IllegalStateException("chave já cadastrada para outro correntista");
+            throw new BusinessRuleViolationException("chave já cadastrada para outro correntista");
         }
 
         // 3) Limite por conta
-        // TODO: quando houver HolderType (PF/PJ), aplicar PF=5 e PJ=20. Por ora, default=5.
-        int limit = 5;
+        final int LIMIT = 5;
         long current = repo.countByAgencyAndAccount(agency, account);
-        if (current >= limit) {
-            throw new IllegalStateException("limite de chaves por conta atingido");
+        if (current >= LIMIT) {
+            throw new BusinessRuleViolationException("limite de chaves por conta atingido");
         }
 
         // 4) Persistência
@@ -65,7 +65,7 @@ public class PixKeyService {
                 .orElseThrow(() -> new NotFoundException("pix key não encontrada: " + id));
 
         if (current.isInactive()) {
-            throw new IllegalStateException("chave já inativada");
+            throw new BusinessRuleViolationException("chave já inativada");
         }
 
         PixKey updated = current.inactivate();
@@ -85,14 +85,12 @@ public class PixKeyService {
                 .orElseThrow(() -> new NotFoundException("pix key não encontrada: " + id));
 
         // 2) Regras de negócio de limite por conta
-        long countAtTarget = repo.countByAgencyAndAccount(agency, account);
-        // Se a chave já está nessa conta, desconsidere ela do count
-        if (agency.equals(current.agency()) && account.equals(current.account())) {
-            // não muda o número total efetivo
-        } else {
-            int limit = 5; // TODO: quando houver HolderType (PF/PJ), aplicar PF=5 e PJ=20
-            if (countAtTarget >= limit) {
-                throw new IllegalStateException("limite de chaves por conta atingido");
+        boolean sameAccount = agency.equals(current.agency()) && account.equals(current.account());
+        if (!sameAccount) {
+            final int LIMIT = 5; // TODO: quando houver HolderType (PF/PJ), usar PF=5 / PJ=20
+            long countAtTarget = repo.countByAgencyAndAccount(agency, account);
+            if (countAtTarget >= LIMIT) {
+                throw new BusinessRuleViolationException("limite de chaves por conta atingido");
             }
         }
 

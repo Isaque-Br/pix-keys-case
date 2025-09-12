@@ -1,5 +1,6 @@
 package br.com.itau.pixkeys.api;
 
+import br.com.itau.pixkeys.domain.BusinessRuleViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -14,13 +15,12 @@ import java.util.Map;
 public class ApiExceptionHandler {
 
     // 422 — regra de negócio inválida
-    @ExceptionHandler({ IllegalArgumentException.class, IllegalStateException.class })
-    public ResponseEntity<ProblemDetail> handleBusiness(RuntimeException ex) {
-        var pd = ProblemDetail.forStatus(HttpStatus.UNPROCESSABLE_ENTITY); // 422
-        pd.setTitle("Regra de negócio inválida");
-        pd.setDetail(ex.getMessage());
-
-        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(pd);
+    @ExceptionHandler(BusinessRuleViolationException.class)
+    ProblemDetail handleBusiness(BusinessRuleViolationException e) {
+        ProblemDetail pd = ProblemDetail.forStatus(HttpStatus.UNPROCESSABLE_ENTITY);
+        pd.setTitle("Regra de negócio inválida"); // <- bate com o teste
+        pd.setDetail(e.getMessage());
+        return pd;
     }
 
     // 404 — recurso não encontrado (ADICIONE este)
