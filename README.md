@@ -40,6 +40,7 @@ cd ..
 - Authentication
 Username: admin
 Password: 123
+```
 ____________________________________________________________
 
 Decisões de Projeto (o “porquê” das escolhas)
