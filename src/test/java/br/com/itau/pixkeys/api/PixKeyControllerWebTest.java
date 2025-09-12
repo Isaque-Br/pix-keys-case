@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.http.MediaType.APPLICATION_JSON;
 import br.com.itau.pixkeys.application.service.PixKeyService;
 import br.com.itau.pixkeys.domain.AccountType;
+import br.com.itau.pixkeys.domain.BusinessRuleViolationException;
 import br.com.itau.pixkeys.domain.KeyStatus;
 import br.com.itau.pixkeys.domain.KeyType;
 import br.com.itau.pixkeys.domain.model.PixKey;
@@ -66,18 +67,19 @@ class PixKeyControllerWebTest {
                 .andExpect(jsonPath("$.fields.account").exists());
     }
 
+    // POST 422 - regra de negócio (duplicidade)
     @Test
     void post_shouldReturn422_withDetail_whenBusinessRuleFails() throws Exception {
         when(service.create(any(), anyString(), any(), anyString(), anyString(), anyString(), any()))
-                .thenThrow(new IllegalStateException("chave já cadastrada"));
+                .thenThrow(new BusinessRuleViolationException("chave já cadastrada"));
 
         mvc.perform(post("/pix-keys")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                    {"keyType":"EMAIL","keyValue":"dup@b.com","accountType":"corrente",
-                     "agency":"1234","account":"00001234","holderName":"Ana","holderSurname":"Silva"}
-                """))
-                .andExpect(status().isUnprocessableEntity())            // contrato: 422
+                {"keyType":"EMAIL","keyValue":"dup@b.com","accountType":"corrente",
+                 "agency":"1234","account":"00001234","holderName":"Ana","holderSurname":"Silva"}
+            """))
+                .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.title").value("Regra de negócio inválida"))
                 .andExpect(jsonPath("$.detail").value("chave já cadastrada"));
     }
@@ -193,15 +195,14 @@ class PixKeyControllerWebTest {
     // PUT 422 - regra de negócio (limite de chaves)
     @Test
     void put_shouldReturn422_whenBusinessRuleFails() throws Exception {
-        // Por quê: converte IllegalStateException em 422 via ApiExceptionHandler.
         when(service.updateAccount(anyString(), any(), anyString(), anyString(), anyString(), any()))
-                .thenThrow(new IllegalStateException("limite de chaves por conta atingido"));
+                .thenThrow(new BusinessRuleViolationException("limite de chaves por conta atingido"));
 
         mvc.perform(put("/pix-keys/{id}/account", "abc")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                            {"accountType":"poupanca","agency":"9999","account":"00009999","holderName":"Ana","holderSurname":"Silva"}
-                        """))
+                        {"accountType":"poupanca","agency":"9999","account":"00009999","holderName":"Ana","holderSurname":"Silva"}
+                    """))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.title").value("Regra de negócio inválida"))
                 .andExpect(jsonPath("$.detail").value("limite de chaves por conta atingido"));
@@ -230,7 +231,7 @@ class PixKeyControllerWebTest {
     @Test
     void delete_shouldReturn422_whenAlreadyInactive() throws Exception {
         when(service.inactivate("abc"))
-                .thenThrow(new IllegalStateException("chave já inativada"));
+                .thenThrow(new BusinessRuleViolationException("chave já inativada"));
 
         mvc.perform(delete("/pix-keys/abc").accept(APPLICATION_JSON))
                 .andExpect(status().isUnprocessableEntity())

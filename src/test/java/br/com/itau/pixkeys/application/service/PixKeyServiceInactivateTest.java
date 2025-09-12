@@ -2,6 +2,7 @@ package br.com.itau.pixkeys.application.service;
 
 import br.com.itau.pixkeys.api.NotFoundException;
 import br.com.itau.pixkeys.domain.AccountType;
+import br.com.itau.pixkeys.domain.BusinessRuleViolationException;
 import br.com.itau.pixkeys.domain.KeyStatus;
 import br.com.itau.pixkeys.domain.KeyType;
 import br.com.itau.pixkeys.domain.model.PixKey;
@@ -18,12 +19,12 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;   // <-- verify, when, never, etc.
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class PixKeyServiceInactivateTest {
 
-    @Mock KeyValidatorFactory factory; // não usado aqui, mas exigido pelo ctor do service
+    @Mock KeyValidatorFactory factory;              // não usado aqui, mas exigido pelo ctor do service
     @Mock PixKeyRepository repo;
 
     @InjectMocks PixKeyService service;
@@ -39,6 +40,7 @@ class PixKeyServiceInactivateTest {
 
     @Test
     void shouldThrow422_whenAlreadyInactive() {
+        // DADO: chave já inativa no repositório
         PixKey inactive = new PixKey(
                 "id1", KeyType.EMAIL, "a@b.com",
                 AccountType.CHECKING, "1234", "00001234",
@@ -47,9 +49,18 @@ class PixKeyServiceInactivateTest {
         );
         when(repo.findById("id1")).thenReturn(Optional.of(inactive));
 
-        assertThrows(IllegalStateException.class, () -> service.inactivate("id1"));
+        // QUANDO + ENTÃO: service deve falhar com 422 (exceção de regra de negócio)
+        BusinessRuleViolationException ex = assertThrows(BusinessRuleViolationException.class,
+                () -> service.inactivate("id1"));
 
+        // Mensagem coerente com a regra
+        assertNotNull(ex.getMessage());
+        assertTrue(ex.getMessage().toLowerCase().contains("inativ"));
+
+        // Interações esperadas
+        verify(repo).findById("id1");
         verify(repo, never()).save(any());
+        verifyNoMoreInteractions(repo);
     }
 
     @Test
