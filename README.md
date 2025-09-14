@@ -18,75 +18,91 @@ ________________________________________________________________________________
 - *(Opcional)* **MongoDB Compass** – para inspecionar o banco em desenvolvimento
 
 ### Dev (subir app + Mongo local)
+
+### 1) Banco local
 ```bash
-# 1) Banco local
 cd local
 docker compose up -d
+```
 
-# 2) App
+### 2) Aplicação
+```bash
 cd ..
 ./mvnw spring-boot:run
+```
 
-# todos os testes (unit + integração com Testcontainers)
+### Todos os testes (unit + integração com Testcontainers)
+```bash
 ./mvnw test
+```
 
-# rodar e abrir relatório de cobertura (JaCoCo) 
-./mvnw verify target/site/jacoco/index.html
-
-### Acesso rápido
-- Swagger UI: http://localhost:8080/swagger-ui/index.html
+### Rodar e abrir relatório de cobertura (JaCoCo)
+```bash
+./mvnw verify && open target/site/jacoco/index.html.```
+```
+### Acesso para API no OpenAPI - Swagger:
+http://localhost:8080/swagger-ui/index.html
 
 #### Dica (MongoDB Compass)
+
 Após `docker compose up -d` em `local/`, conecte no Compass com:
 - Connection: `mongodb://localhost:27017`
 - Authentication
-Username: admin
-Password: 123
-```
-____________________________________________________________
+- Username: admin
+- Password: 123
+__________________________________________________________________________
 
-Decisões de Projeto (o “porquê” das escolhas)
-1) Strategy + Factory para validação por tipo de chave
+## Decisões de Projeto
 
-Problema: cada tipo (EMAIL/PHONE/CPF/CNPJ/RANDOM) tem regras próprias.
+### 1. Strategy + Factory (validação por tipo de chave)
 
-Solução: uma Strategy por tipo (validadores especializados) entregue por uma Factory.
+- **Contexto:** cada tipo de chave (EMAIL, PHONE, CPF, CNPJ, RANDOM) possui regras de validação próprias.
+- **Problema:** sem uma estratégia clara, seria necessário um `if/switch` no `service`, o que viola princípios de design (acoplamento alto e difícil manutenção).
+- **Escolha:** apliquei **Strategy**, onde cada tipo de chave tem seu **KeyValidator** especializado, A seleção da estratégia fica numa Factory **(KeyValidatorFactory)**, evitando espalhar new ...Validator() pelo código.
+- **Por que essa estratégia?**
+  - Facilita **extensão**: adicionar um novo tipo não exige mexer nos outros (`OCP` – Open/Closed Principle).
+  - Permite **testabilidade isolada**: cada validador é testado de forma independente; no `service`, podemos “mockar” a factory.
+  - Código limpo: nada de if/else ou switch no fluxo de negócio.
+- 🔗 **Referência:** [Refactoring Guru – Strategy Pattern](https://refactoring.guru/design-patterns/strategy)
 
-Benefícios: elimina if/switch no service, aplica OCP (adicionar novo tipo sem tocar nos outros), deixa a regra testável isoladamente.
+---
 
-**Referência:** https://refactoring.guru/
+## 2. Banco de Dados — MongoDB (por quê?)
 
-2) Specification-like (Criteria) para consultas combináveis
+**Contexto.** O domínio de PixKey é naturalmente “document-like”: os JSONs de entrada/saída mapeiam 1-para-1 para a entidade persistida e não há necessidade de *joins* entre múltiplas tabelas.
 
-Problema: filtros variáveis (tipo, agência+conta, nome, datas), e no Mongo não há JpaSpecification.
+**Motivação.**
+- **Modelo orientado a documento (JSON-first):** a estrutura dos dados da API (JSON) é salva de forma quase idêntica no banco de dados, eliminando a necessidade de tradução entre eles.
+- **Schema flexível:** adicionamos campos no tempo sem migrações SQL (mudanças são tratadas no domínio/DTOs).
+- **Índices simples e eficientes:**
+  - **Unicidade global da chave** (`keyValue`) garantida por índice único.
+  - **Consultas frequentes** (ex.: por `agency+account`, `status`) atendidas com índices compostos.
+- **Developer-experience:** Spring Data MongoDB + Docker/Testcontainers tornam o *setup* local e os testes de integração limpos e simples de implementar.
 
-Solução: construção de Query com Criteria via MongoTemplate.
+**Trade-offs.**
+- **Sem `JpaSpecificationExecutor`:** o Spring Data MongoDB não tem Specification nativo.
+  - **Mitigação:** usamos um **Specification-like** com `MongoTemplate` + `Criteria` (seção 3).
+- **Sem *joins* relacionais:** modelagem deve favorecer **aggregation by document**
 
-Benefícios: regras de combinação centralizadas, reuso e legibilidade sem “if spaghetti” em repositório.
+**Modelagem & Índice**
+- Índice único para `keyValue` (garante regra de unicidade global).
+- Índice composto para consultas por conta/estado:
+  - `{ agency: 1, account: 1, status: 1 }` (ajuda nas telas/relatórios por conta).
 
-3) Problem Details (RFC-7807) para erros
+## 3. Specification-like (Criteria para consultas combináveis)
 
-400: validação (Bean Validation) com mapa fields.
+- **Contexto:** consultas precisam de filtros variáveis (tipo, agência+conta, nome, datas).
+- **Problema:** no **JPA** existe `JpaSpecificationExecutor` para compor filtros, mas no **MongoDB** não há suporte nativo ao padrão Specification.
+- **Escolha:** implementar uma abordagem *Specification-like* usando `Criteria` do `MongoTemplate`.
+- **Por que essa estratégia?**
+  - Permite **composição dinâmica** de filtros (como no padrão Specification).
+  - Centraliza regras de filtragem, aumentando **clareza e reuso**.
+  - Evita “spaghetti” de `if/else` para montar queries no repositório.
+- **Benefício adicional:** mantemos a ideia de *Specification Pattern* do DDD e do [Refactoring Guru](https://refactoring.guru/design-patterns/specification), mas adaptada ao ecossistema MongoDB.
 
-404: recurso inexistente.
 
-422: violações de negócio (duplicidade, limite, chave inativa etc.).
+---
 
-Benefício: respostas padronizadas e previsíveis para o consumidor.
-
-4) Domínio enxuto e seguro
-
-Entidade PixKey imutável (trocas geram novo snapshot) com transições controladas (inactivate, updateAccount).
-
-Guard-clauses no domínio evitam estados inválidos (ex.: dupla inativação).
-
-5) Testes de verdade
-
-Unitários (service, domínio, validadores): cobrem fluxos felizes e de erro.
-
-Integração com Mongo real (Testcontainers): garante índices, conversões e comportamento do driver no mundo real.
-
-Cobertura: linhas ~98% / branches ≥90% (JaCoCo).
 ____________________________________________________________________________________________________
 ### Quando cada status é retornado
 
@@ -99,7 +115,7 @@ ________________________________________________________________________________
 - **422 Unprocessable Entity** – **regra de negócio** violada:
   - `keyValue` já cadastrado para outro correntista;
   - limite de chaves por conta atingido (>= **5** para `agency+account`);
-  - valor rejeitado pelo **validador do tipo** (e-mail/telefone/CPF/CNPJ/RANDOM).  
+  - valor rejeitado pelo **validador do tipo** (e-mail/telefone/CPF/CNPJ/RANDOM).
     > `RANDOM` deve ser **alfanumérico de 32 caracteres**.
 
 #### GET `/pix-keys/{id}`
@@ -107,12 +123,12 @@ ________________________________________________________________________________
 - **404 Not Found** – id inexistente.
 
 #### PATCH `/pix-keys/{id}/inactivate`
-- **204 No Content** – inativação concluída (soft delete).
+- **200 No Content** – inativação concluída (soft delete).
 - **404 Not Found** – id inexistente.
 - **422 Unprocessable Entity** – chave **já está inativa**.
 
 #### PUT `/pix-keys/{id}/account`
-- **200 OK** – conta atualizada.  
+- **200 OK** – conta atualizada.
   > Se `agency+account` permanecerem os mesmos, **não** há checagem de limite.
 - **400 Bad Request** – erro de **Bean Validation** do corpo (ex.: `agency`/`account` com tamanho inválido, `holderName` em branco).
 - **404 Not Found** – id inexistente.
@@ -121,7 +137,5 @@ ________________________________________________________________________________
   - ao mover para **outra** conta, o destino já possui **>= 5** chaves.
 
 > **Observação:** a API **não expõe `DELETE`**. A remoção lógica é feita via **PATCH `/inactivate`**. Uma chamada `DELETE /pix-keys/{id}` resultará em **405 Method Not Allowed**.
-
-Acesse:
 
 Swagger UI: http://localhost:8080/swagger-ui/index.html
