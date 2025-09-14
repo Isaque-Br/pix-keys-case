@@ -5,6 +5,8 @@ import br.com.itau.pixkeys.api.dto.CreatePixKeyResponse;
 import br.com.itau.pixkeys.api.dto.PixKeyResponse;
 import br.com.itau.pixkeys.api.dto.UpdatePixKeyAccountRequest;
 import br.com.itau.pixkeys.application.service.PixKeyService;
+import br.com.itau.pixkeys.domain.model.PixKey;
+import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,8 +31,14 @@ public class PixKeyController {
                 req.holderName(), req.holderSurname()
         );
         return ResponseEntity
-                .created(URI.create("/pix-keys/" + id))
+                .created(URI.create("/pix-keys/" + id))   // seta Location + 201
                 .body(new CreatePixKeyResponse(id));
+    }
+
+    @PostMapping("/{id}:inactivate")
+    public ResponseEntity<PixKeyResponse> inactivate(@PathVariable String id) {
+        PixKey updated = service.inactivate(id);
+        return ResponseEntity.ok(PixKeyResponse.from(updated));
     }
 
     @GetMapping("/{id}")
@@ -52,6 +60,7 @@ public class PixKeyController {
         return ResponseEntity.ok(PixKeyResponse.from(updated));
     }
 
+    @Hidden
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable String id) {
         service.inactivate(id);
