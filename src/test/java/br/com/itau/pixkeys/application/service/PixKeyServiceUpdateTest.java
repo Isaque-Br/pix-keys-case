@@ -29,25 +29,29 @@ class PixKeyServiceUpdateTest {
 
     @Test
     void updateAccount_shouldSave_whenMovingToAnotherAccount_underLimit() {
-        // dado: chave ativa na conta A (1250/00001234)
+        // DADO: chave ativa na conta A (1250/00001234)
         PixKey current = new PixKey("k1", KeyType.EMAIL, "a@b.com",
                 AccountType.CHECKING, "1250", "00001234",
                 "Ana", "Silva", KeyStatus.ACTIVE, Instant.now(), null);
-        when(repo.findById("k1")).thenReturn(Optional.of(current)); // 1) encontra e retorna a chave atual
-        when(repo.countByAgencyAndAccount("2222", "00002222")).thenReturn(0L); // 2) destino abaixo do limite
+        when(repo.findById("k1")).thenReturn(Optional.of(current));             // 1) encontra atual
+        when(repo.countByAgencyAndAccount("2222", "00002222")).thenReturn(0L);  // 2) destino < limite
         when(repo.save(any(PixKey.class))).thenAnswer(inv -> inv.getArgument(0)); // 4) ecoa salvo
 
-        // quando: muda para conta B (2222/00002222)
+        // QUANDO: muda para conta B (2222/00002222)
         PixKey out = service.updateAccount("k1", AccountType.SAVINGS,
                 "2222", "00002222", "Ana Paula", "Silva");
 
-        // então: salvou com novos dados
-        assertEquals("2222", out.agency());                   // agência mudou
-        assertEquals("00002222", out.account());              // conta mudou
-        assertEquals(AccountType.SAVINGS, out.accountType()); // tipo mudou
-        assertEquals("Ana Paula", out.holderName());          // titular atualizado
-        verify(repo).save(any(PixKey.class));                 // persistiu alteração
+        // ENTÃO: salvou com novos dados
+        assertEquals("2222", out.agency());
+        assertEquals("00002222", out.account());
+        assertEquals(AccountType.SAVINGS, out.accountType());
+        assertEquals("Ana Paula", out.holderName());
+
+        // Verifica que CHECOU o limite exatamente uma vez e persistiu
+        verify(repo).countByAgencyAndAccount("2222", "00002222");
+        verify(repo).save(any(PixKey.class));
     }
+
 
     @Test
     void updateAccount_shouldIgnoreLimit_whenStayingInSameAccount_andUpdateHolderName() {
@@ -56,9 +60,6 @@ class PixKeyServiceUpdateTest {
                 AccountType.CHECKING, "1250", "00001234",
                 "Ana", "Silva", KeyStatus.ACTIVE, Instant.now(), null);
         when(repo.findById("k1")).thenReturn(Optional.of(current));
-
-        // NÃO consulta o limite quando é a mesma conta
-        verify(repo, never()).countByAgencyAndAccount(anyString(), anyString());
 
         when(repo.save(any(PixKey.class))).thenAnswer(inv -> inv.getArgument(0));
 

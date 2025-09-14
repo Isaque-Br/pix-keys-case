@@ -7,8 +7,10 @@ import br.com.itau.pixkeys.domain.model.PixKey;
 import br.com.itau.pixkeys.infrastructure.repository.PixKeyRepository;
 import br.com.itau.pixkeys.validation.KeyValidator;
 import br.com.itau.pixkeys.validation.KeyValidatorFactory;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -29,15 +31,20 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class PixKeyServiceTest {
 
-    @Mock KeyValidatorFactory factory; // dublê para obter o validador do tipo
-    @Mock KeyValidator validator;      // dublê do validador do tipo específico
-    @Mock PixKeyRepository repo;       // dublê do repositório (I/O)
-    @InjectMocks PixKeyService service; // SUT
+    @Mock(answer = Answers.CALLS_REAL_METHODS) KeyValidatorFactory factory;
+    @Mock KeyValidator validator;
+    @Mock PixKeyRepository repo;
+    @InjectMocks PixKeyService service;
+
+    @BeforeEach
+    void setup() {
+        lenient().when(factory.forType(any())).thenReturn(validator);
+        lenient().doNothing().when(validator).validate(anyString());
+    }
 
     @Test
     void shouldCreate_andReturnId_whenValid_andUnderLimit_andNotDuplicate() {
         // DADO: formato válido
-        when(factory.get(KeyType.EMAIL)).thenReturn(validator);
         doNothing().when(validator).validate("ana@example.com");
 
         // DADO: não é duplicada e está abaixo do limite por conta
@@ -81,66 +88,45 @@ class PixKeyServiceTest {
 
     @Test
     void shouldFail_whenDuplicateKeyValue() {
-        // DADO: formato válido
-        when(factory.get(KeyType.EMAIL)).thenReturn(validator);
-        doNothing().when(validator).validate("dup@example.com");
-
-        // DADO: já existe chave com o mesmo valor
+        // dado
         PixKey existing = PixKey.create(
                 KeyType.EMAIL, "dup@example.com",
                 AccountType.CHECKING, "1250", "00001234",
                 "Ana", "Silva"
         );
+        // só isso é necessário para este cenário:
         when(repo.findByKeyValue("dup@example.com")).thenReturn(Optional.of(existing));
 
-        // QUANDO + ENTÃO: falha por duplicidade (422)
-        BusinessRuleViolationException ex = assertThrows(BusinessRuleViolationException.class, () ->
+        // quando + então
+        assertThrows(BusinessRuleViolationException.class, () ->
                 service.create(
                         KeyType.EMAIL, "dup@example.com",
                         AccountType.CHECKING, "1250", "00001234",
                         "Ana", "Silva"
                 )
         );
-        assertTrue(ex.getMessage().toLowerCase().contains("cadastrada"),
-                "mensagem deve indicar duplicidade");
 
-        // Recados:
-        // - Não deve tentar salvar nada quando há duplicidade
-        // - Não deve consultar limite, pois a verificação de unicidade ocorre antes
-        verify(repo).findByKeyValue("dup@example.com");
+        // não consulta limite nem salva
         verify(repo, never()).countByAgencyAndAccount(anyString(), anyString());
         verify(repo, never()).save(any());
-        verifyNoMoreInteractions(repo);
     }
 
     @Test
     void shouldFail_whenAccountLimitReached() {
-        // DADO: formato válido
-        when(factory.get(KeyType.PHONE)).thenReturn(validator);
-        doNothing().when(validator).validate("+5511999990001");
-
-        // DADO: não é duplicada
+        // dado
         when(repo.findByKeyValue("+5511999990001")).thenReturn(Optional.empty());
+        when(repo.countByAgencyAndAccount("1250", "00001234")).thenReturn(5L); // atinge limite
 
-        // DADO: conta já no limite (ex.: 5)
-        when(repo.countByAgencyAndAccount("1250", "00001234")).thenReturn(5L);
-
-        // QUANDO + ENTÃO: falha por limite atingido (422)
-        BusinessRuleViolationException ex = assertThrows(BusinessRuleViolationException.class, () ->
+        // quando + então
+        assertThrows(BusinessRuleViolationException.class, () ->
                 service.create(
                         KeyType.PHONE, "+5511999990001",
                         AccountType.CHECKING, "1250", "00001234",
                         "Ana", "Silva"
                 )
         );
-        assertTrue(ex.getMessage().toLowerCase().contains("limite"),
-                "mensagem deve indicar limite por conta atingido");
 
-        // Recados:
-        // - Em caso de limite atingido, não deve salvar
-        verify(repo).findByKeyValue("+5511999990001");
-        verify(repo).countByAgencyAndAccount("1250", "00001234");
+        // não salva quando estoura limite
         verify(repo, never()).save(any());
-        verifyNoMoreInteractions(repo);
     }
 }

@@ -1,5 +1,6 @@
 package br.com.itau.pixkeys.validation;
 
+import br.com.itau.pixkeys.domain.BusinessRuleViolationException;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -10,8 +11,8 @@ class CnpjKeyValidatorTest {
 
     @Test
     void shouldReject_null_orBlank() {
-        assertThrows(IllegalArgumentException.class, () -> v.validate(null));
-        assertThrows(IllegalArgumentException.class, () -> v.validate("   "));
+        assertThrows(BusinessRuleViolationException.class, () -> v.validate(null));
+        assertThrows(BusinessRuleViolationException.class, () -> v.validate("   "));
     }
 
     @Test
@@ -22,8 +23,13 @@ class CnpjKeyValidatorTest {
 
     @Test
     void shouldReject_wrongLength_orRepeatedDigits_orWrongDigits() {
-        assertThrows(IllegalArgumentException.class, () -> v.validate("12.345.678/0001-9"));
-        assertThrows(IllegalArgumentException.class, () -> v.validate("00000000000000"));
-        assertThrows(IllegalArgumentException.class, () -> v.validate("12.345.678/0001-96"));
+        assertThrows(BusinessRuleViolationException.class, () -> v.validate("12.345.678/0001-9"));  // 13 dígitos
+        assertThrows(BusinessRuleViolationException.class, () -> v.validate("00000000000000"));     // todos iguais
+        assertThrows(BusinessRuleViolationException.class, () -> v.validate("12.345.678/0001-96")); // DV inválido
+    }
+
+    @Test
+    void shouldReject_disallowedCharacters() {
+        assertThrows(BusinessRuleViolationException.class, () -> v.validate("12.345.678/0001-9A"));
     }
 }

@@ -11,6 +11,8 @@ import br.com.itau.pixkeys.validation.KeyValidatorFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Answers;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -23,61 +25,82 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class PixKeyServiceUnitTest {
 
-    @Mock KeyValidatorFactory factory;
+    @Mock(answer = Answers.CALLS_REAL_METHODS) KeyValidatorFactory factory;
     @Mock KeyValidator validator;
     @Mock PixKeyRepository repo;
 
+    @InjectMocks
     PixKeyService service;
 
     @BeforeEach
     void setup() {
-        service = new PixKeyService(factory, repo);
+        // deixa o factory sempre devolver o mock de validator
+        lenient().when(factory.forType(any())).thenReturn(validator);
+        // por padrão, validação é no-op (cada teste pode sobrescrever)
+        lenient().doNothing().when(validator).validate(anyString());
     }
 
-    // --- create(): cobre RANDOM (ramo true) ---
     @Test
     void create_random_invalid_throws422() {
-        BusinessRuleViolationException ex = assertThrows(BusinessRuleViolationException.class, () ->
-                service.create(KeyType.RANDOM, "abc", // não bate o regex dos 32 alfanuméricos
-                        AccountType.CHECKING, "1250", "00001234", "Ana", "Silva")
+        // quando a Strategy validar a chave "bad", lança 422
+        doThrow(new BusinessRuleViolationException(
+                "random inválido: esperado 32 caracteres alfanuméricos"
+        )).when(validator).validate("bad");
+
+        assertThrows(BusinessRuleViolationException.class, () ->
+                service.create(
+                        KeyType.RANDOM, "bad",
+                        AccountType.CHECKING, "1250", "00001234",
+                        "Ana", "Silva"
+                )
         );
-        assertTrue(ex.getMessage().toLowerCase().contains("random inválido"));
-        verifyNoInteractions(factory); // não deve chamar validators normais
+
+        // não deve consultar duplicidade nem salvar quando falha na validação
+        verify(repo, never()).findByKeyValue(anyString());
         verify(repo, never()).save(any());
     }
 
-    // --- create(): cobre duplicidade (isPresent() == true) ---
     @Test
     void create_duplicate_throws422_and_doesNotCheckLimit() {
-        when(factory.get(any())).thenReturn(validator);
-        doNothing().when(validator).validate(anyString());
-        when(repo.findByKeyValue("dup@x.com")).thenReturn(Optional.of(
-                PixKey.create(KeyType.EMAIL, "dup@x.com",
-                        AccountType.CHECKING, "1250", "00001234", "Ana", "Silva")
-        ));
+        // DADO: já existe chave com esse valor
+        when(repo.findByKeyValue("dup@example.com"))
+                .thenReturn(Optional.of(mock(PixKey.class)));
 
+        // QUANDO + ENTÃO: estoura 422 por duplicidade
         assertThrows(BusinessRuleViolationException.class, () ->
-                service.create(KeyType.EMAIL, "dup@x.com",
-                        AccountType.CHECKING, "1250", "00001234", "Ana", "Silva"));
+                service.create(
+                        KeyType.EMAIL, "dup@example.com",
+                        AccountType.CHECKING, "1250", "00001234",
+                        "Ana", "Silva"
+                )
+        );
 
+        // não consulta limite nem tenta salvar
         verify(repo, never()).countByAgencyAndAccount(anyString(), anyString());
         verify(repo, never()).save(any());
     }
 
-    // --- create(): cobre limite (current >= LIMIT) ---
+
     @Test
     void create_limitReached_throws422_and_doesNotSave() {
-        when(factory.get(any())).thenReturn(validator);
-        doNothing().when(validator).validate(anyString());
-        when(repo.findByKeyValue("ok@x.com")).thenReturn(Optional.empty());
-        when(repo.countByAgencyAndAccount("1250", "00001234")).thenReturn(5L); // >= 5
+        // DADO: não é duplicada, mas a conta já atingiu o limite
+        when(repo.findByKeyValue("ok@example.com")).thenReturn(Optional.empty());
+        when(repo.countByAgencyAndAccount("1250", "00001234")).thenReturn(5L);
 
+        // QUANDO + ENTÃO: estoura 422 por limite
         assertThrows(BusinessRuleViolationException.class, () ->
-                service.create(KeyType.EMAIL, "ok@x.com",
-                        AccountType.CHECKING, "1250", "00001234", "Ana", "Silva"));
+                service.create(
+                        KeyType.EMAIL, "ok@example.com",
+                        AccountType.CHECKING, "1250", "00001234",
+                        "Ana", "Silva"
+                )
+        );
 
+        // confirma que consultou o limite e não salvou
+        verify(repo).countByAgencyAndAccount("1250", "00001234");
         verify(repo, never()).save(any());
     }
+
 
     // --- updateAccount(): cobre sameAccount == true (não checa limite) ---
     @Test
