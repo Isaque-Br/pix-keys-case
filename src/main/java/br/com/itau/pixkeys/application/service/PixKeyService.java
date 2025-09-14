@@ -9,12 +9,10 @@ import br.com.itau.pixkeys.infrastructure.repository.PixKeyRepository;
 import br.com.itau.pixkeys.validation.KeyValidatorFactory;
 import org.springframework.stereotype.Service;
 
-/**
- * Regras de criação de chaves Pix.
- * Passos: validar formato → checar unicidade → checar limite por conta → persistir.
- */
 @Service
 public class PixKeyService {
+
+    private static final int ACCOUNT_KEYS_LIMIT = 5;
 
     private final KeyValidatorFactory factory;
     private final PixKeyRepository repo;
@@ -30,25 +28,17 @@ public class PixKeyService {
             AccountType accountType, String agency, String account,
             String holderName, String holderSurname
     ) {
-        // 1) Validação de formato/semântica
-        if (keyType == KeyType.RANDOM) {
-            // 32 caracteres alfanuméricos (A–Z, a–z, 0–9)
-            if (keyValue == null || !keyValue.matches("^[A-Za-z0-9]{32}$")) {
-                throw new BusinessRuleViolationException("random inválido: esperado 32 caracteres alfanuméricos");
-            }
-        } else {
-            factory.get(keyType).validate(keyValue);
-        }
+        // 1) Validação (delegada à Strategy)
+        factory.forType(keyType).validate(keyValue);
 
-        // 2) Unicidade global do valor da chave
+        // 2) Unicidade global
         if (repo.findByKeyValue(keyValue).isPresent()) {
             throw new BusinessRuleViolationException("chave já cadastrada para outro correntista");
         }
 
         // 3) Limite por conta
-        final int LIMIT = 5;
         long current = repo.countByAgencyAndAccount(agency, account);
-        if (current >= LIMIT) {
+        if (current >= ACCOUNT_KEYS_LIMIT) {
             throw new BusinessRuleViolationException("limite de chaves por conta atingido");
         }
 
@@ -56,8 +46,7 @@ public class PixKeyService {
         PixKey entity = PixKey.create(
                 keyType, keyValue, accountType, agency, account, holderName, holderSurname
         );
-        PixKey saved = repo.save(entity);
-        return saved.id();
+        return repo.save(entity).id();
     }
 
     /** Busca por ID ou lança 404 (NotFoundException) para o handler transformar em HTTP 404. */
@@ -70,15 +59,14 @@ public class PixKeyService {
     public PixKey inactivate(String id) {
         PixKey current = repo.findById(id)
                 .orElseThrow(() -> new NotFoundException("pix key não encontrada: " + id));
-
         if (current.isInactive()) {
             throw new BusinessRuleViolationException("chave já inativada");
         }
-
         PixKey updated = current.inactivate();
         return repo.save(updated);
     }
 
+    /** Troca a conta da chave (valida limite quando muda de conta). */
     public PixKey updateAccount(
             String id,
             AccountType accountType,
@@ -94,9 +82,8 @@ public class PixKeyService {
         // 2) Regras de negócio de limite por conta
         boolean sameAccount = agency.equals(current.agency()) && account.equals(current.account());
         if (!sameAccount) {
-            final int LIMIT = 5; // TODO: quando houver HolderType (PF/PJ), usar PF=5 / PJ=20
             long countAtTarget = repo.countByAgencyAndAccount(agency, account);
-            if (countAtTarget >= LIMIT) {
+            if (countAtTarget >= ACCOUNT_KEYS_LIMIT) {
                 throw new BusinessRuleViolationException("limite de chaves por conta atingido");
             }
         }
