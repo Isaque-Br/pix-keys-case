@@ -22,13 +22,13 @@ public enum AccountType {
         String stripped = value.strip();
         if (stripped.isEmpty()) return null;
 
-        String v = Normalizer.normalize(stripped, Normalizer.Form.NFD)
+        String normalizedValue = Normalizer.normalize(stripped, Normalizer.Form.NFD)
                 .replaceAll("\\p{M}+", "")
                 .toLowerCase(Locale.ROOT);
 
-        return switch (v) {
-            case "corrente"  -> CHECKING;
-            case "poupanca"  -> SAVINGS;
+        return switch (normalizedValue) {
+            case "corrente" -> CHECKING;
+            case "poupanca" -> SAVINGS;
             default -> throw new IllegalArgumentException("tipo conta inválido: " + value);
         };
     }
