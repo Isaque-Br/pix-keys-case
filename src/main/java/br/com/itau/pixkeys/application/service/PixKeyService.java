@@ -22,7 +22,9 @@ public class PixKeyService {
         this.repo = repo;
     }
 
-    /** Cria a chave aplicando regras de negócio e retorna o ID gerado. */
+    /**
+     * Cria a chave aplicando regras de negócio e retorna o ID gerado.
+     */
     public String create(
             KeyType keyType, String keyValue,
             AccountType accountType, String agency, String account,
@@ -49,13 +51,17 @@ public class PixKeyService {
         return repo.save(entity).id();
     }
 
-    /** Busca por ID ou lança 404 (NotFoundException) para o handler transformar em HTTP 404. */
+    /**
+     * Busca por ID ou lança 404 (NotFoundException) para o handler transformar em HTTP 404.
+     */
     public PixKey findById(String id) {
         return repo.findById(id).orElseThrow(() ->
                 new NotFoundException("pix key não encontrada: " + id));
     }
 
-    /** Inativa (soft delete) a chave. Lança 404 se não existir e 422 se já estiver inativa. */
+    /**
+     * Inativa (soft delete) a chave. Lança 404 se não existir e 422 se já estiver inativa.
+     */
     public PixKey inactivate(String id) {
         PixKey current = repo.findById(id)
                 .orElseThrow(() -> new NotFoundException("pix key não encontrada: " + id));
@@ -66,32 +72,41 @@ public class PixKeyService {
         return repo.save(updated);
     }
 
-    /** Troca a conta da chave (valida limite quando muda de conta). */
+    /**
+     * Troca a conta da chave (valida limite quando muda de conta).
+     */
     public PixKey updateAccount(
             String id,
-            AccountType accountType,
-            String agency,
-            String account,
-            String holderName,
-            String holderSurname
+            AccountType newAccountType,
+            String newAgency,
+            String newAccount,
+            String newHolderName,
+            String newHolderSurname
     ) {
         // 1) Carrega ou 404
         PixKey current = repo.findById(id)
                 .orElseThrow(() -> new NotFoundException("pix key não encontrada: " + id));
 
-        // 2) Regras de negócio de limite por conta
-        boolean sameAccount = agency.equals(current.agency()) && account.equals(current.account());
+        // 2) Regra mais barata: não permite alterar chave inativa
+        if (current.isInactive()) {
+            throw new BusinessRuleViolationException("chave inativa");
+        }
+
+        // 3) Só valida limite se realmente trocar agência/conta
+        boolean sameAccount = current.agency().equals(newAgency) && current.account().equals(newAccount);
         if (!sameAccount) {
-            long countAtTarget = repo.countByAgencyAndAccount(agency, account);
+            long countAtTarget = repo.countByAgencyAndAccount(newAgency, newAccount);
             if (countAtTarget >= ACCOUNT_KEYS_LIMIT) {
                 throw new BusinessRuleViolationException("limite de chaves por conta atingido");
             }
         }
 
-        // 3) Atualiza no domínio (valida inatividade)
-        PixKey updated = current.updateAccount(accountType, agency, account, holderName, holderSurname);
+        // 4) Atualiza no domínio (mantém invariantes e normalização)
+        PixKey updated = current.updateAccount(
+                newAccountType, newAgency, newAccount, newHolderName, newHolderSurname
+        );
 
-        // 4) Persiste e retorna entidade
+        // 5) Persiste e retorna
         return repo.save(updated);
     }
 }
