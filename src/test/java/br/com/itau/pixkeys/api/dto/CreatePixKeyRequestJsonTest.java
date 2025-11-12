@@ -3,6 +3,7 @@ package br.com.itau.pixkeys.api.dto;
 import br.com.itau.pixkeys.domain.AccountType;
 import br.com.itau.pixkeys.domain.KeyType;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -12,6 +13,7 @@ class CreatePixKeyRequestJsonTest {
     private final ObjectMapper mapper = new ObjectMapper();
 
     @Test
+    @DisplayName("Deve serializar o DTO com AccountType em pt-BR e manter Enum KeyType no padrão")
     void serialize_shouldUsePtBrForAccountType_andKeepEnumNamesForKeyType() throws Exception {
         var req = new CreatePixKeyRequest(
                 KeyType.EMAIL,
@@ -25,6 +27,7 @@ class CreatePixKeyRequestJsonTest {
 
         String json = mapper.writeValueAsString(req);
 
+        // Verifica que cada campo está sendo serializado corretamente
         assertTrue(json.contains("\"keyType\":\"EMAIL\""), "Enum KeyType sai pelo nome");
         assertTrue(json.contains("\"keyValue\":\"ana.silva+pix@exemplo.com\""));
         assertTrue(json.contains("\"accountType\":\"corrente\""), "@JsonValue do AccountType em pt-BR");
@@ -35,6 +38,7 @@ class CreatePixKeyRequestJsonTest {
     }
 
     @Test
+    @DisplayName("Deve desserializar JSON com acento em 'poupança' corretamente")
     void deserialize_shouldAcceptAccountTypeWithAccent() throws Exception {
         String json = """
         {
@@ -57,5 +61,4 @@ class CreatePixKeyRequestJsonTest {
         assertEquals("Ana", req.holderName());
         assertEquals("Silva", req.holderSurname());
     }
-
 }
