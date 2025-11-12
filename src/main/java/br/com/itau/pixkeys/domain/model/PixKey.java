@@ -18,7 +18,7 @@ import java.util.UUID;
         // Unicidade global do VALOR DA CHAVE (critério do case)
         @CompoundIndex(name = "uk_key_value", def = "{ 'keyValue': 1 }", unique = true),
         // Índice para consultas por conta (agência+conta)
-        @CompoundIndex(name = "idx_account",  def = "{ 'agency': 1, 'account': 1 }")
+        @CompoundIndex(name = "idx_account", def = "{ 'agency': 1, 'account': 1 }")
 })
 public record PixKey(
         @Id String id,                 // ID exigido pelo case em formato UUID (string)
@@ -35,25 +35,29 @@ public record PixKey(
 ) {
     // Fábrica: cria chave ATIVA e normaliza campos
     public static PixKey create(
-            KeyType t, String v,
-            AccountType at, String ag, String acc,
-            String name, String surname
+            KeyType keyType,
+            String keyValue,
+            AccountType accountType,
+            String agency,
+            String account,
+            String holderName,
+            String holderSurname
     ) {
-        Objects.requireNonNull(t,  "keyType não pode ser nulo");
-        Objects.requireNonNull(at, "accountType não pode ser nulo");
+        Objects.requireNonNull(keyType, "keyType não pode ser nulo");
+        Objects.requireNonNull(accountType, "accountType não pode ser nulo");
 
         return new PixKey(
-                UUID.randomUUID().toString(), // gera UUID conforme case
-                t,
-                nzs(v),        // obrigatório: não-nulo + strip() (unicode-aware)
-                at,
-                nzs(ag),       // obrigatório
-                nzs(acc),      // obrigatório
-                nzs(name),     // obrigatório
-                nz(surname),   // opcional: null -> "" + strip()
-                KeyStatus.ACTIVE,
-                Instant.now(),
-                null
+                UUID.randomUUID().toString(),  // gera UUID conforme case
+                keyType,                       // tipo da chave (PHONE/EMAIL/CPF/CNPJ)
+                requireAndTrim(keyValue),      // obrigatório: não-nulo + strip()
+                accountType,                   // corrente/poupança
+                requireAndTrim(agency),        // obrigatório
+                requireAndTrim(account),       // obrigatório
+                requireAndTrim(holderName),    // obrigatório
+                sanitizeOptional(holderSurname), // opcional: null -> "" + strip()
+                KeyStatus.ACTIVE,              // status inicial
+                Instant.now(),                 // data de criação
+                null                           // ainda não inativada
         );
     }
 
@@ -77,21 +81,26 @@ public record PixKey(
 
     // Atualiza dados da conta/titular (não altera id/tipo/valor)
     public PixKey updateAccount(
-            AccountType at, String ag, String acc, String name, String surname
+            AccountType accountType,
+            String agency,
+            String account,
+            String holderName,
+            String holderSurname
     ) {
         if (isInactive()) {
             throw new BusinessRuleViolationException("chave inativa");
         }
-        Objects.requireNonNull(at, "accountType não pode ser nulo");
+        Objects.requireNonNull(accountType, "accountType não pode ser nulo");
+
         return new PixKey(
                 id,
                 keyType,
                 keyValue,
-                at,
-                nzs(ag),
-                nzs(acc),
-                nzs(name),
-                nz(surname),
+                accountType,
+                requireAndTrim(agency),
+                requireAndTrim(account),
+                requireAndTrim(holderName),
+                sanitizeOptional(holderSurname),
                 status,
                 createdAt,
                 inactivatedAt
@@ -99,10 +108,11 @@ public record PixKey(
     }
 
     // Helpers: normalização consistente
-    private static String nz(String s) {
-        return s == null ? "" : s.strip();
+    private static String sanitizeOptional(String value) {
+        return value == null ? "" : value.strip();
     }
-    private static String nzs(String s) {
-        return Objects.requireNonNull(s, "valor obrigatório").strip();
+
+    private static String requireAndTrim(String value) {
+        return Objects.requireNonNull(value, "valor obrigatório").strip();
     }
 }
